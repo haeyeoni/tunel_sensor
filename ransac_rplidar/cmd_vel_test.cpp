@@ -1,4 +1,8 @@
 #include "line_ransac.h"
+typedef pcl::PointCloud<pcl::PointXYZ> PointCloud;
+typedef pcl::PCLPointCloud2 PointCloud2;
+typedef PointCloud::Ptr PointCloudPtr;
+typedef PointCloud2::Ptr PointCloud2Ptr;
 
 
 void callback(ros::Publisher publisher){
@@ -8,19 +12,21 @@ void callback(ros::Publisher publisher){
     publisher.publish(cmd_vel);
 }
 
+void read_nearest
+
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "talker");
+  	ros::init(argc, argv, "talker");
 
-  ros::NodeHandle nh;
-  ros::Publisher publisher = nh.advertise<geometry_msgs::Twist> ("cmd_vel", 10);
-  
-  //ros::Subscriber<geometry_msgs::TwistStamped> wheel_odom(nh, "/wheel_odom", 10);
-
+  	ros::NodeHandle nh;
+  	ros::Subscriber<geometry_msgs::TwistStamped> rp_subscribe = nh.subscribe("/scan", 10, extract_points);
+  	
+  	ros::Publisher cmd_publisher = nh.advertise<geometry_msgs::Twist> ("cmd_vel", 10);
+	ros::Publisher nearest_publisher = nh.advertise<sensor_msgs::PointCloud2> ("line_points
     while(ros::ok()) {
         ros::spinOnce();
-	callback(publisher);
+		callback(publisher);
     }
 
   return 0;
