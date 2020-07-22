@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/nvidia/HY/ransac_rplidar/build/devel/setup.sh
