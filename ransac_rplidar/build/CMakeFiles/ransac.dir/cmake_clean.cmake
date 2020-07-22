@@ -1,5 +1,5 @@
 file(REMOVE_RECURSE
-  "CMakeFiles/ransac.dir/imu_process.cpp.o"
+  "CMakeFiles/ransac.dir/cmd_vel_test.cpp.o"
   "ransac.pdb"
   "ransac"
 )

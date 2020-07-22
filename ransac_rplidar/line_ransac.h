@@ -45,4 +45,5 @@
 #include <pcl/point_types.h>
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/conversions.h>
+#include <geometry_msgs/Twist.h>
 #endif //SENSOR_COMPARE_COUNT_POINT_H

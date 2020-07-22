@@ -7,6 +7,6 @@
 # new environment variables
 
 # modified environment variables
-export CMAKE_PREFIX_PATH="/home/nvidia/HY/ransac_rplidar/build/devel:$CMAKE_PREFIX_PATH"
-export ROSLISP_PACKAGE_DIRECTORIES="/home/nvidia/HY/ransac_rplidar/build/devel/share/common-lisp:$ROSLISP_PACKAGE_DIRECTORIES"
-export ROS_PACKAGE_PATH="/home/nvidia/HY/ransac_rplidar:$ROS_PACKAGE_PATH"
+export CMAKE_PREFIX_PATH="/home/postech/HY/tunel_sensor/ransac_rplidar/build/devel:$CMAKE_PREFIX_PATH"
+export ROSLISP_PACKAGE_DIRECTORIES="/home/postech/HY/tunel_sensor/ransac_rplidar/build/devel/share/common-lisp:$ROSLISP_PACKAGE_DIRECTORIES"
+export ROS_PACKAGE_PATH="/home/postech/HY/tunel_sensor/ransac_rplidar:$ROS_PACKAGE_PATH"
