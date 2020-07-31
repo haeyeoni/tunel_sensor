@@ -36,9 +36,7 @@ set(G2O_LIBS g2o_core g2o_stuff g2o_types_sba g2o_types_slam3d)
 
 add_executable(rp_drive 
 cmd_vel_test.cpp
-#imu_process.cpp 
 cmd_vel_test.h 
-#imu_process.h
 )
 
 target_link_libraries(rp_drive

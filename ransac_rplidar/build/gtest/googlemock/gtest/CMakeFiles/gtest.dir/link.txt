@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC -std=c++14 -o3  -g   -shared -Wl,-soname,libgtest.so -o libgtest.so CMakeFiles/gtest.dir/src/gtest-all.cc.o  -L/home/haeyeon/tunel_sensor/ransac_rplidar/build/gtest/googlemock/gtest/src -Wl,-rpath,/home/haeyeon/tunel_sensor/ransac_rplidar/build/gtest/googlemock/gtest/src -lpthread 

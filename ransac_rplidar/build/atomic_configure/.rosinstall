@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/haeyeon/tunel_sensor/ransac_rplidar/build/devel/setup.sh
