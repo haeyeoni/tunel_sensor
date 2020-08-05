@@ -1,3 +1,37 @@
+// Copyright 2020, Postech, Cocel
+//
+// This code reads the sensor data from the RP Lidar to detect the center of the road.
+// After finding the center position and the robot's direction, it sends the command to make the robot move to the center position.
+// The code procedures are following
+
+// 1. LineExtractRP class
+// @Subscribes:
+// 			* RPLidar sensor data ("/scan_rp")
+// @Publishes: 
+//			* Road line cluster that is possible range of robot. ("/cluster_line")
+//			* Current robot's nearest point which can be used to infer the direction of the robot ("/nearest_point")
+//			* Average coordinates of "/cluster_line" which can be used to infer the center of the rod ("/reference_point")
+//			* Points data set of nearest point and reference point ("/points_msg")
+// @Process
+// 	1.1 Reads sensor data by subscribing "scan_rp" topic which is laserScan data type.
+// 	1.2 Since RP Lidar scans 360 degree surrounding, the pointcloud range is croped to have forward area with 1 meter width. 
+//  1.3 Using RANSAC algorithm, we extract the line segments from the point cloud.
+//  1.4 Under asumption that the ground has two pits on eighter side of the road, the road line is extracted from the line clusters which are obtained at (1.3). 
+//  1.5 After procedure, the class publish the multiple points data
+//
+// 2. Command class
+// @Subscribes:
+// 			* Points data processed by LineExtractRP class ("/points_msg")
+// @Publishes: 
+//			* Velocity commands ("/cmd_vel")
+// @Process
+// 	2.1 Reads the point data which is current direction point (points_msg[0]) and the road center point (points_msg[1]).
+//  2.2 The command value is calculated accrording to the difference between the two points.
+//  2.3 Publish the velocity command which has linear.x, angluar.z value.  
+
+
+
+
 #include "cmd_vel_test.h"
 
 class LineExtractRP
@@ -5,42 +39,47 @@ class LineExtractRP
 public:
     LineExtractRP() {
 		this->subscriber = this->nh.subscribe("/scan_rp", 10, &LineExtractRP::LineExtract, this);
+		this->pub_line = this->nh.advertise<sensor_msgs::PointCloud2>("cluster_line", 10);
 		this->pub_nearest = this->nh.advertise<sensor_msgs::PointCloud2> ("nearest_point", 10);
 	 	this->pub_ref = this->nh.advertise<sensor_msgs::PointCloud2> ("reference_point", 10);
 		this->pub_points = this->nh.advertise<sensor_msgs::PointCloud2> ("points_msg", 10);
-		this->pub_line = this->nh.advertise<sensor_msgs::PointCloud2>("cluster_line", 10);
     };
 	
     void LineExtract(const sensor_msgs::LaserScan::ConstPtr& scan_in) {
-		// publish message
-		float Width = 1.0;
+
+		float Width = 1.0; //<- Data to be cropped (aisle width)
+
+		// Messages to be published
 		sensor_msgs::PointCloud2 nearest_point;
 		sensor_msgs::PointCloud2 reference_point;      
 		sensor_msgs::PointCloud2 points_msg;
 		sensor_msgs::PointCloud2 points_line;
-		
-		sensor_msgs::PointCloud2 cloud_temp;      
 
-		PointCloudPtr cloud(new PointCloud); //data cloud
-		PointCloud2Ptr cloud2(new PointCloud2); // data cloud (2)
-		PointCloudPtr cloud_inrange(new PointCloud); // cropped cloud
-
+		// Message data before converted to the ROS messages
 		PointCloud closest;
 		PointCloud filtered_cloud;
 		PointCloud point_set;
 		PointCloud cluseter_line;
+
+
+		sensor_msgs::PointCloud2 cloud_temp; // <- temporary point cloud to temporaly save the input point cloud     
+		PointCloudPtr cloud(new PointCloud); // <- data cloud
+		PointCloud2Ptr cloud2(new PointCloud2); // <- data cloud2 (converted from the cloud)
+		PointCloudPtr cloud_inrange(new PointCloud); // <- cropped cloud
+
 		
-		// conversions from laser to pointcloud 2
+		// DATA TYPE CONVERSIONS: LaserScan (scan_in) -> PointCloud2 (cloud2)
 		projector_.projectLaser(*scan_in, cloud_temp);
-		pcl_conversions::toPCL(cloud_temp, *cloud2); // save cloud message to cloud2
+		pcl_conversions::toPCL(cloud_temp, *cloud2); 
 		pcl::fromPCLPointCloud2(*cloud2, *cloud); 
 
-		// crop pointcloud (cloud -> cloud_inrange) 
+		// CROP POINTCLOUD (cloud -> cloud_inrange) 
 		pcl::ConditionAnd<pcl::PointXYZ>::Ptr range_condition(new pcl::ConditionAnd<pcl::PointXYZ> ());
+			// set condition
 		range_condition->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZ>("y", pcl::ComparisonOps::GT, -Width)));
 		range_condition->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZ>("y", pcl::ComparisonOps::LT, Width)));
 		range_condition->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZ>("x", pcl::ComparisonOps::LT, 0.0)));
-
+			// conditional removal
 		pcl::ConditionalRemoval<pcl::PointXYZ> condrem;
 		condrem.setInputCloud(cloud);
 		condrem.setCondition(range_condition);
@@ -48,38 +87,37 @@ public:
 		condrem.filter(*cloud_inrange);
 
 
-		// extract line (input cloud_inragne) 
-
+		// EXTRACT LINE (RANSAC ALGORITHM): cloud_inragne changed 
 		pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
 		pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
 		pcl::SACSegmentation<pcl::PointXYZ> seg;
 		pcl::ExtractIndices<pcl::PointXYZ> extract;
-		
 		seg.setOptimizeCoefficients(true);
-		seg.setModelType(pcl::SACMODEL_LINE);
+		seg.setModelType(pcl::SACMODEL_LINE); // <- extract model setting
 		seg.setMethodType(pcl::SAC_RANSAC);
-		seg.setDistanceThreshold(0.5);
+		seg.setDistanceThreshold(0.5); // <- threshold (line width)
 		seg.setInputCloud(cloud_inrange);
 		seg.segment(*inliers, *coefficients);
 		extract.setInputCloud(cloud_inrange);
 		extract.setIndices(inliers);
-		extract.setNegative(false);
+		extract.setNegative(false); //<- if true, it returns point cloud except the line.
 		extract.filter(*cloud_inrange);
 
-		// line clustering
 
+		// CENTER LINE CLUSTER IS EXTRACTED AMONG MULTIPLE LINE CLUSTERS 
+			// clustering... 
 		pcl::search::KdTree<pcl::PointXYZ>::Ptr tree_cluster(new pcl::search::KdTree<pcl::PointXYZ>);
 		tree_cluster->setInputCloud(cloud_inrange);
 		std::vector<pcl::PointIndices> cluster_indices;
 		pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
 		ec.setInputCloud(cloud_inrange);
-		ec.setClusterTolerance(0.05);
-		ec.setMinClusterSize(30);
+		ec.setClusterTolerance(0.05); // <- If the two points have distance bigger than this tolerance, then points go to different clusters. 
+		ec.setMinClusterSize(30); 
 		ec.setMaxClusterSize(1000);;
 		ec.setSearchMethod(tree_cluster);
 		ec.extract(cluster_indices);
 
-		// extract first clustering
+			// extract first clustering (center cluster)
 		int j = 0;
 		std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin ();
 		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZ>);
@@ -95,24 +133,21 @@ public:
 				cloud_cluster->is_dense = true;
 			}
 			j++;
-
 		}
 
-		// find nearest point from the origin
+		// FIND NEAREST POINT FROM THE ORIGIN ( => /nearest_point)
 		if((*cloud_cluster).size()>0){
-			cout<<"start: "<<cloud_cluster->points[0].x<<", "<<cloud_cluster->points[0].y<<endl;
-			cout<<"End: "<<cloud_cluster->points[(*cloud_cluster).size()-1].x<<", "<<cloud_cluster->points[(*cloud_cluster).size()-1].y<<endl;
-
 			pcl::PointXYZ origin(0, 0, 0);	
 			pcl::KdTree<pcl::PointXYZ>::Ptr tree_(new pcl::KdTreeFLANN<pcl::PointXYZ>);
 			tree_->setInputCloud(cloud_cluster);
-			std::vector<int> nn_indices(1);
+			std::vector<int> nn_indices(1); 
 			std::vector<float> nn_dists(1);
-			tree_->nearestKSearch(origin, 1, nn_indices, nn_dists);
-				closest.push_back(cloud_cluster->points[nn_indices[0]]);
-
-			point_set.push_back(closest[0]);
+			tree_->nearestKSearch(origin, 1, nn_indices, nn_dists); //<- finds the most closest sing point: save points index to "nn_indices", and distance to "nn_dists"
 			
+			closest.push_back(cloud_cluster->points[nn_indices[0]]); 
+			point_set.push_back(closest[0]);
+
+		// CALCULATE THE AVERAGE COORDINATES FROM THE CENTER LINE( => /reference_point)
 			float current_x = cloud_cluster->points[nn_indices[0]].x;
 			float current_y = cloud_cluster->points[nn_indices[0]].y;
 			float threshold = 0.5;
@@ -133,7 +168,8 @@ public:
 				
 			reference_cloud.push_back(reference);
 			point_set.push_back(reference);
-			
+
+		// PUBLISH ROS MESSAGES
 			pcl::toROSMsg(closest, nearest_point);
 			pcl::toROSMsg((*cloud_cluster), points_line);
 			pcl::toROSMsg(reference_cloud, reference_point);
